@@ -167,8 +167,7 @@ def main():
     ap.add_argument("-z", "--zoom", type=int, default=1,
                     help="magnify the spectrum center (2-4 suits the attractors)")
     ap.add_argument("-g", "--grain", type=float, default=0.0,
-                    help="noise mixed into the field before the fft; ~3 drowns "
-                         "the attractor into a pure glow, ~1 leaves it ghostly")
+                    help="noise mixed into the field before the fft")
     ap.add_argument("--corner", action="store_true",
                     help="skip the fftshift: the spectrum glow sits in the corner")
     ap.add_argument("--gamma", type=float, default=1.25,

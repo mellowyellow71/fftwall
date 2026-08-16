@@ -33,8 +33,7 @@ and downscaling averages it away.
 - `-s WxH` size, `-c` colormap, `-o` output dir, `--seed` reproduce a run
 - `-d freq|space|both` — spectrum, the attractor itself, or both
 - `-z` magnifies the spectrum center (2-4 suits the attractors)
-- `-g/--grain` mixes noise into the field before the fft: ~1 leaves the
-  attractor ghostly in the speckle, ~3 drowns it into a pure glow
+- `-g/--grain` mixes noise into the field before the fft
 - `--corner` skips the fftshift so the glow sits in a corner
 - `--gamma` spectrum tone curve: <1 spreads the glow and lifts the
   background, >1 darkens (default 1.25)

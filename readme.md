@@ -21,10 +21,6 @@ python3 -m venv .venv
 .venv/bin/python fftwall.py ikeda -z 2             # magnify spectrum center
 .venv/bin/python fftwall.py all -s 7680x4320       # every system at 8k
 .venv/bin/python fftwall.py clifford --seed 7 -o out
-
-# two looks worth stealing:
-.venv/bin/python fftwall.py clifford -c gold -g 2.5 -z 3 --gamma 0.75
-.venv/bin/python fftwall.py dejong -c dust -g 1 --corner -z 2 --gamma 0.7
 ```
 
 every run without `--seed` is a new wallpaper; the seed is printed and

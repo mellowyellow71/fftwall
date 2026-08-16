@@ -15,12 +15,19 @@ python3 -m venv .venv
 
 ```
 .venv/bin/python fftwall.py                        # kuramoto lattice, 4k, inferno
+.venv/bin/python fftwall.py quasicrystal           # diffraction star
 .venv/bin/python fftwall.py waves -c dragon        # kanagawa-dragon palette
 .venv/bin/python fftwall.py ikeda -d both          # save spectrum + source
+.venv/bin/python fftwall.py lorenz -z 3            # magnify spectrum center
+.venv/bin/python fftwall.py sandpile -d space      # the mandala itself
 .venv/bin/python fftwall.py all -s 7680x4320       # every system at 8k
-.venv/bin/python fftwall.py lorenz -z 3               # magnify spectrum center
-.venv/bin/python fftwall.py waves --seed 7 -o out
+.venv/bin/python fftwall.py clifford --seed 7 -o out
 ```
+
+every run without `--seed` is a new wallpaper; the seed is printed and
+baked into the filename, so re-render any keeper at a bigger size.
+render at your display's native resolution — the speckle is per-pixel,
+and downscaling averages it away.
 
 ## systems
 
@@ -39,6 +46,9 @@ python3 -m venv .venv
   (try `-z 2`), ~15 s
 - `sandpile` — abelian sandpile mandala; dot-grid constellation
   spectrum, the slow one (~1-2 min)
+
+`clifford`, `grayscott`, and `sandpile` are good wallpapers in the
+space domain too — pass `-d space` or `-d both`.
 
 ## colormaps
 

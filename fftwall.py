@@ -178,7 +178,124 @@ def gen_lorenz(w, h, rng):
     return density(np.concatenate(xs), -np.concatenate(zs), w, h)
 
 
-SYSTEMS = {"kuramoto": gen_kuramoto, "waves": gen_waves, "ikeda": gen_ikeda, "lorenz": gen_lorenz}
+def gen_quasicrystal(w, h, rng, folds=None):
+    """plane waves at n-fold symmetric angles; the spectrum is a
+    diffraction star like a real quasicrystal's."""
+    n = int(folds or rng.choice([5, 7, 9, 11]))
+    X = (np.arange(w, dtype=np.float32) - w / 2) / w
+    Y = (np.arange(h, dtype=np.float32)[:, None] - h / 2) / w
+    a0 = rng.uniform(0, np.pi)
+    field = np.zeros((h, w), np.float32)
+    for f, amp in ((w * rng.uniform(0.10, 0.16), 1.0), (w * rng.uniform(0.22, 0.30), 0.5)):
+        for i in range(n):
+            t = a0 + np.pi * i / n
+            field += amp * np.cos(2 * np.pi * f * (np.cos(t) * X + np.sin(t) * Y)
+                                  + rng.uniform(0, 2 * np.pi)).astype(np.float32)
+    field = field / n + 0.10 * fractal_noise(w, h, rng).astype(np.float32)
+
+    def tukey(m, a=0.12):
+        t = np.linspace(0, 1, m, dtype=np.float32)
+        win = np.ones(m, np.float32)
+        edge = t < a
+        win[edge] = 0.5 * (1 - np.cos(np.pi * t[edge] / a))
+        return win * win[::-1]
+
+    return field * tukey(w)[None, :] * tukey(h)[:, None]
+
+
+def gen_chladni(w, h, rng):
+    """standing-wave plate modes; bright nodal lines. each mode adds a
+    dot pair to the spectrum, the nodal nonlinearity adds combination
+    tones between them."""
+    X = np.arange(w, dtype=np.float32) / w
+    Y = np.arange(h, dtype=np.float32)[:, None] / h
+    field = np.zeros((h, w), np.float32)
+    lo, hi = max(6, int(w * 0.02)), int(w * 0.36)
+    for _ in range(rng.integers(4, 9)):
+        n1, m1 = rng.integers(lo, hi, 2)
+        s = rng.choice([-1.0, 1.0])
+        a = rng.uniform(0.4, 1.0) * rng.choice([-1.0, 1.0])
+        field += a * (np.cos(n1 * np.pi * X) * np.cos(m1 * np.pi * Y)
+                      + s * np.cos(m1 * np.pi * X) * np.cos(n1 * np.pi * Y))
+    nodal = np.exp(-(field / (0.13 * field.std())) ** 2).astype(np.float32)
+    return nodal + rng.normal(0, 0.02, (h, w)).astype(np.float32)
+
+
+CLIFFORD = [(-1.4, 1.6, 1.0, 0.7), (1.7, 1.7, 0.6, 1.2), (-1.7, 1.3, -0.1, -1.2),
+            (-1.8, -2.0, -0.5, -0.9), (1.5, -1.8, 1.6, 0.9), (-1.7, 1.8, -1.9, -0.4)]
+
+
+def gen_clifford(w, h, rng):
+    """clifford strange attractor point-cloud density."""
+    a, b, c, d = np.array(CLIFFORD[rng.integers(len(CLIFFORD))]) + rng.normal(0, 0.03, 4)
+    p = rng.uniform(-1, 1, (4096, 2))
+    xs, ys = [], []
+    for i in range(2500):
+        x, y = p[:, 0], p[:, 1]
+        p = np.stack([np.sin(a * y) + c * np.cos(a * x),
+                      np.sin(b * x) + d * np.cos(b * y)], axis=1)
+        if i >= 50:
+            xs.append(p[:, 0].copy())
+            ys.append(p[:, 1].copy())
+    return density(np.concatenate(xs), np.concatenate(ys), w, h)
+
+
+def gen_grayscott(w, h, rng):
+    """gray-scott reaction-diffusion (pearson). the pattern's single
+    characteristic wavelength puts a glowing ring in the spectrum.
+    simulated at reduced resolution, ~30s."""
+    s = max(1, round(w / 880))
+    sw, sh = w // s, h // s
+    U = np.ones((sh, sw), np.float32)
+    V = np.zeros_like(U)
+    for _ in range(int(rng.integers(8, 20))):
+        px, py = int(rng.integers(4, sw - 4)), int(rng.integers(4, sh - 4))
+        U[py - 3:py + 3, px - 3:px + 3] = 0.5
+        V[py - 3:py + 3, px - 3:px + 3] = 0.25
+    F, k = [(0.037, 0.060), (0.030, 0.062), (0.055, 0.062), (0.046, 0.063)][rng.integers(4)]
+    Du, Dv, dt = 0.16, 0.08, 1.0
+
+    def lap(A):
+        return (np.roll(A, 1, 0) + np.roll(A, -1, 0) + np.roll(A, 1, 1) + np.roll(A, -1, 1) - 4 * A)
+
+    for _ in range(8000):
+        UVV = U * V * V
+        U += (Du * lap(U) - UVV + F * (1 - U)) * dt
+        V += (Dv * lap(V) + UVV - (F + k) * V) * dt
+    field = np.asarray(Image.fromarray(V).resize((w, h), Image.BICUBIC))
+    return field + rng.normal(0, 0.006, (h, w)).astype(np.float32)
+
+
+def gen_sandpile(w, h, rng):
+    """abelian sandpile: drop ~1.5M grains, relax to the fractal
+    mandala. slowest system here (~1-2 min)."""
+    n = min(840, min(w, h))
+    a = np.zeros((n, n), np.int32)
+    drops = 1 if rng.random() < 0.6 else int(rng.integers(2, 5))
+    total = int(1.7 * n * n)
+    for _ in range(drops):
+        px, py = (n // 2, n // 2) if drops == 1 else rng.integers(int(n * 0.35), int(n * 0.65), 2)
+        a[py, px] += total // drops
+    for _ in range(60000):
+        if a.max() < 4:
+            break
+        c = a >> 2
+        a &= 3
+        a += np.roll(c, 1, 0) + np.roll(c, -1, 0) + np.roll(c, 1, 1) + np.roll(c, -1, 1)
+    ys, xs = np.nonzero(a)
+    a = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1].astype(np.float32)
+    scale = min(h / a.shape[0], w / a.shape[1])
+    tw, th = int(a.shape[1] * scale), int(a.shape[0] * scale)
+    img = np.asarray(Image.fromarray(a).resize((tw, th), Image.NEAREST))
+    field = np.zeros((h, w), np.float32)
+    oy, ox = (h - th) // 2, (w - tw) // 2
+    field[oy:oy + th, ox:ox + tw] = img
+    return field
+
+
+SYSTEMS = {"kuramoto": gen_kuramoto, "waves": gen_waves, "ikeda": gen_ikeda, "lorenz": gen_lorenz,
+           "quasicrystal": gen_quasicrystal, "chladni": gen_chladni, "clifford": gen_clifford,
+           "grayscott": gen_grayscott, "sandpile": gen_sandpile}
 
 
 # ---------------------------------------------------------------- main

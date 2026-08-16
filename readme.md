@@ -30,6 +30,15 @@ python3 -m venv .venv
 - `waves` — interfering plane waves over 1/f noise; starburst spectra
 - `ikeda` — ikeda map point-cloud density
 - `lorenz` — lorenz attractor trajectory density
+- `quasicrystal` — plane waves at n-fold symmetric angles; the spectrum
+  is a diffraction star like a real quasicrystal's
+- `chladni` — vibrating-plate nodal lines; constellation spectrum
+- `clifford` — clifford strange attractor; radiating filament starburst
+- `grayscott` — gray-scott reaction-diffusion; the pattern's single
+  characteristic wavelength puts a glowing ring in the spectrum
+  (try `-z 2`), ~15 s
+- `sandpile` — abelian sandpile mandala; dot-grid constellation
+  spectrum, the slow one (~1-2 min)
 
 ## colormaps
 

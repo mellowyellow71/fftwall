@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.png
+out/
+test/
+samples/

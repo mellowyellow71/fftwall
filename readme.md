@@ -2,7 +2,8 @@
 
 procedurally generated fourier transform wallpapers.
 
-simulate a mathematical system → 2d fft → log-magnitude → colormap.
+iterate a chaotic map → point-cloud density → 2d fft → log-magnitude → colormap.
+the attractor itself and its spectrum are both wallpapers.
 
 ## setup
 
@@ -14,12 +15,10 @@ python3 -m venv .venv
 ## use
 
 ```
-.venv/bin/python fftwall.py                        # kuramoto lattice, 4k, inferno
-.venv/bin/python fftwall.py quasicrystal           # diffraction star
-.venv/bin/python fftwall.py waves -c dragon        # kanagawa-dragon palette
-.venv/bin/python fftwall.py ikeda -d both          # save spectrum + source
-.venv/bin/python fftwall.py lorenz -z 3            # magnify spectrum center
-.venv/bin/python fftwall.py sandpile -d space      # the mandala itself
+.venv/bin/python fftwall.py                        # clifford, 4k, inferno
+.venv/bin/python fftwall.py svensson -d both       # spectrum + the attractor itself
+.venv/bin/python fftwall.py dejong -c dragon       # kanagawa-dragon palette
+.venv/bin/python fftwall.py ikeda -z 2             # magnify spectrum center
 .venv/bin/python fftwall.py all -s 7680x4320       # every system at 8k
 .venv/bin/python fftwall.py clifford --seed 7 -o out
 ```
@@ -31,24 +30,14 @@ and downscaling averages it away.
 
 ## systems
 
-- `kuramoto` — lattice of coupled phase oscillators; each cell draws its
-  oscillator's waveform. the repeating grid puts sharp harmonics in the
-  spectrum (this is what your original wallpaper was)
-- `waves` — interfering plane waves over 1/f noise; starburst spectra
-- `ikeda` — ikeda map point-cloud density
-- `lorenz` — lorenz attractor trajectory density
-- `quasicrystal` — plane waves at n-fold symmetric angles; the spectrum
-  is a diffraction star like a real quasicrystal's
-- `chladni` — vibrating-plate nodal lines; constellation spectrum
 - `clifford` — clifford strange attractor; radiating filament starburst
-- `grayscott` — gray-scott reaction-diffusion; the pattern's single
-  characteristic wavelength puts a glowing ring in the spectrum
-  (try `-z 2`), ~15 s
-- `sandpile` — abelian sandpile mandala; dot-grid constellation
-  spectrum, the slow one (~1-2 min)
+- `ikeda` — ikeda map (light in a ring cavity); swirling interference rings
+- `dejong` — peter de jong map; smoky folded filament clouds
+- `svensson` — svensson map; looping ribbon sheets and glowing tori
 
-`clifford`, `grayscott`, and `sandpile` are good wallpapers in the
-space domain too — pass `-d space` or `-d both`.
+each seed also picks a curated parameter set, so silhouettes vary a lot
+run to run. the space domain (`-d space` or `-d both`) is often the
+better wallpaper — the spectra like `-z 2`.
 
 ## colormaps
 

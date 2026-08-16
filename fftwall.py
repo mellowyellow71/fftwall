@@ -14,18 +14,22 @@ from PIL import Image
 
 # ---------------------------------------------------------------- colormaps
 
-# custom kanagawa-dragon ramps: (position, hex) anchors, interpolated in rgb
-KANAGAWA = {
+# custom ramps: (position, hex) anchors, interpolated in rgb.
+# dragon/ember are kanagawa-dragon; gold is navy->yellow glow; dust is
+# dark film-grain warm cream.
+CUSTOM = {
     "dragon": [(0.00, "0d0c0c"), (0.35, "2d4f67"), (0.72, "8ba4b0"), (1.00, "c5c9c5")],
     "ember":  [(0.00, "0d0c0c"), (0.38, "3a2426"), (0.74, "c4746e"), (1.00, "c4b28a")],
+    "gold":   [(0.00, "0b1229"), (0.55, "27508f"), (0.85, "9db3cf"), (1.00, "ffe94a")],
+    "dust":   [(0.00, "0d0c0c"), (0.45, "3f382e"), (0.78, "a08d72"), (0.93, "e7d8b1"), (1.00, "f0b070")],
 }
 
 
 def lut(name):
     """256x3 uint8 lookup table for a colormap name."""
-    if name in KANAGAWA:
-        pos = np.array([p for p, _ in KANAGAWA[name]])
-        rgb = np.array([[int(h[i:i + 2], 16) for i in (0, 2, 4)] for _, h in KANAGAWA[name]])
+    if name in CUSTOM:
+        pos = np.array([p for p, _ in CUSTOM[name]])
+        rgb = np.array([[int(h[i:i + 2], 16) for i in (0, 2, 4)] for _, h in CUSTOM[name]])
         t = np.linspace(0, 1, 256)
         return np.stack([np.interp(t, pos, rgb[:, c]) for c in range(3)], axis=1).astype(np.uint8)
     from matplotlib import colormaps
@@ -140,13 +144,17 @@ SYSTEMS = {"clifford": gen_clifford, "ikeda": gen_ikeda,
 
 # ---------------------------------------------------------------- main
 
-def spectrum(field, zoom=1):
-    S = np.log1p(np.fft.fftshift(np.abs(np.fft.fft2(field))))
+def spectrum(field, zoom=1, corner=False, gamma=1.25):
+    F = np.abs(np.fft.fft2(field))
+    S = np.log1p(F if corner else np.fft.fftshift(F))
+    h, w = S.shape
     if zoom > 1:
-        h, w = S.shape
-        ch, cw = h // (2 * zoom), w // (2 * zoom)
-        S = S[h // 2 - ch:h // 2 + ch, w // 2 - cw:w // 2 + cw]
-    return norm(S, 45, 99.95) ** 1.25
+        if corner:
+            S = S[:h // zoom, :w // zoom]
+        else:
+            ch, cw = h // (2 * zoom), w // (2 * zoom)
+            S = S[h // 2 - ch:h // 2 + ch, w // 2 - cw:w // 2 + cw]
+    return norm(S, 45, 99.95) ** gamma
 
 
 def main():
@@ -158,6 +166,14 @@ def main():
     ap.add_argument("-d", "--domain", default="freq", choices=["freq", "space", "both"])
     ap.add_argument("-z", "--zoom", type=int, default=1,
                     help="magnify the spectrum center (2-4 suits the attractors)")
+    ap.add_argument("-g", "--grain", type=float, default=0.0,
+                    help="noise mixed into the field before the fft; ~3 drowns "
+                         "the attractor into a pure glow, ~1 leaves it ghostly")
+    ap.add_argument("--corner", action="store_true",
+                    help="skip the fftshift: the spectrum glow sits in the corner")
+    ap.add_argument("--gamma", type=float, default=1.25,
+                    help="spectrum tone curve; <1 spreads the glow and lifts "
+                         "the background, >1 darkens (default 1.25)")
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("-o", "--outdir", default=".")
     args = ap.parse_args()
@@ -170,12 +186,16 @@ def main():
         rng = np.random.default_rng(seed)
         field = SYSTEMS[name](w, h, rng)
         outs = []
+        fs = field
+        if args.grain > 0:
+            fs = fs + (args.grain * field.std()
+                       * rng.standard_normal(field.shape).astype(np.float32))
         if args.domain in ("freq", "both"):
             p = os.path.join(args.outdir, f"{name}-freq-{seed}.png")
-            img = render(spectrum(field, args.zoom), args.cmap)
-            if img.size != (w, h):
-                img = img.resize((w, h), Image.NEAREST)
-            img.save(p)
+            v = spectrum(fs, args.zoom, args.corner, args.gamma)
+            if v.shape != (h, w):
+                v = np.asarray(Image.fromarray(v.astype(np.float32)).resize((w, h), Image.BILINEAR))
+            render(v, args.cmap).save(p)
             outs.append(p)
         if args.domain in ("space", "both"):
             p = os.path.join(args.outdir, f"{name}-space-{seed}.png")

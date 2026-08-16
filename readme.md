@@ -21,12 +21,27 @@ python3 -m venv .venv
 .venv/bin/python fftwall.py ikeda -z 2             # magnify spectrum center
 .venv/bin/python fftwall.py all -s 7680x4320       # every system at 8k
 .venv/bin/python fftwall.py clifford --seed 7 -o out
+
+# two looks worth stealing:
+.venv/bin/python fftwall.py clifford -c gold -g 2.5 -z 3 --gamma 0.75
+.venv/bin/python fftwall.py dejong -c dust -g 1 --corner -z 2 --gamma 0.7
 ```
 
 every run without `--seed` is a new wallpaper; the seed is printed and
 baked into the filename, so re-render any keeper at a bigger size.
 render at your display's native resolution — the speckle is per-pixel,
 and downscaling averages it away.
+
+## flags
+
+- `-s WxH` size, `-c` colormap, `-o` output dir, `--seed` reproduce a run
+- `-d freq|space|both` — spectrum, the attractor itself, or both
+- `-z` magnifies the spectrum center (2-4 suits the attractors)
+- `-g/--grain` mixes noise into the field before the fft: ~1 leaves the
+  attractor ghostly in the speckle, ~3 drowns it into a pure glow
+- `--corner` skips the fftshift so the glow sits in a corner
+- `--gamma` spectrum tone curve: <1 spreads the glow and lifts the
+  background, >1 darkens (default 1.25)
 
 ## systems
 
@@ -41,7 +56,8 @@ better wallpaper — the spectra like `-z 2`.
 
 ## colormaps
 
-`dragon` and `ember` are kanagawa-dragon ramps; any matplotlib name works
+`dragon` and `ember` are kanagawa-dragon ramps, `gold` is a navy→yellow
+glow, `dust` is dark film-grain cream; any matplotlib name works
 (`inferno`, `magma`, `viridis`, `cubehelix`, `bone`, `twilight`, ...).
 
 ## set as wallpaper (macos)

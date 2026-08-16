@@ -3,7 +3,6 @@
 procedurally generated fourier transform wallpapers.
 
 simulate a mathematical system → 2d fft → log-magnitude → colormap.
-the same trick behind wallhaven's PureMathArt series.
 
 ## setup
 
@@ -42,3 +41,14 @@ python3 -m venv .venv
 ```
 osascript -e 'tell application "System Events" to set picture of every desktop to "/path/to/out.png"'
 ```
+
+## credit
+
+inspired by [PureMathArt](https://wallhaven.cc/user/PureMathArt)'s
+fourier-transform series on wallhaven — reverse-engineering
+[one of their spectra](https://wallhaven.cc/w/jeyg2w) (a coupled-oscillator
+lattice) is what led to this tool.
+
+## license
+
+[mit](LICENSE)

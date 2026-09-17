@@ -138,8 +138,83 @@ def gen_svensson(w, h, rng):
     return density(np.concatenate(xs), np.concatenate(ys), w, h)
 
 
+CURL_AMPS = [1.0, 1.4, 1.8, 2.3, 3.0]
+CURL_MODES = [(0.5, 0.0), (0.35, 0.75), (0.25, 1.6), (0.175, 2.5)]
+
+
+def gen_curl(w, h, rng):
+    """divergence-free vector-field streamlines — silk and lace."""
+    amp = rng.choice(CURL_AMPS)
+    m1, m2 = CURL_MODES[rng.integers(len(CURL_MODES))]
+    t = rng.uniform(0, 2 * np.pi)
+    s = max(w, h)
+    x = (np.arange(w) - w / 2) / s
+    y = (np.arange(h) - h / 2) / s
+    gx, gy = np.meshgrid(x, y)
+    gx += amp * np.cos(m2 * gx + t)
+    gy -= amp * np.sin(m2 * gy + t)
+    psi = np.sin(m1 * gx) * np.cos(m1 * gy) + m1 / 2 * np.sin(m2 * (gx + gy) + t)
+    vx, vy = np.gradient(psi, axis=(1, 0))
+    vx, vy = vy.copy(), -vx.copy()
+    length = np.hypot(vx, vy)
+    if length.max() > 0:
+        vx /= length.max()
+        vy /= length.max()
+    H, W = gx.shape
+    # Jitter breaks the perfect lattice so streamlines trace silk, not spokes.
+    vx += rng.normal(0, 0.02, (H, W)).astype(np.float32)
+    vy += rng.normal(0, 0.02, (h, w)).astype(np.float32)
+    vx = np.where(vx > 0.1, vx, 0)
+    vy = np.where(vy > 0.1, vy, 0)
+    d = np.zeros((H, W), np.float32)
+    # Vectorized streamline tracing: 4096 particles, 1500 steps.
+    px = rng.uniform(0, W, 4096)
+    py = rng.uniform(0, H, 4096)
+    for _ in range(1500):
+        x0 = np.floor(px).astype(int) % W
+        y0 = np.floor(py).astype(int) % H
+        x1 = (x0 + 1) % W
+        y1 = (y0 + 1) % H
+        fx = px - np.floor(px)
+        fy = py - np.floor(py)
+        vxp = (vx[y0,x0]*(1-fx) + vx[y0,x1]*fx) * (1-fy) + (vx[y1,x0]*(1-fx) + vx[y1,x1]*fx) * fy
+        vyp = (vy[y0,x0]*(1-fx) + vy[y0,x1]*fx) * (1-fy) + (vy[y1,x0]*(1-fx) + vy[y1,x1]*fx) * fy
+        ix = px.astype(int) % W
+        iy = py.astype(int) % H
+        d[iy, ix] += 1.0
+        px = (px + vxp * 2.5) % W
+        py = (py + vyp * 2.5) % H
+    return norm(np.log1p(d), 1, 99.9)
+
+
+def gen_lyapunov(w, h, rng):
+    """lyapunov exponent map of two coupled logistic maps."""
+    a_min, a_max = rng.uniform(3.4, 3.7), rng.uniform(4.1, 4.5)
+    b_min, b_max = rng.uniform(3.4, 3.7), rng.uniform(4.1, 4.5)
+    pattern_abc = ['AB', 'AABA', 'ABB', 'ABAB', 'AABBA', 'AAAB']
+    pattern_str = pattern_abc[rng.integers(len(pattern_abc))]
+    pattern = np.array([0 if ch == 'A' else 1 for ch in pattern_str])
+    a_grid = np.linspace(a_min, a_max, w)
+    b_grid = np.linspace(b_min, b_max, h)
+    A, B = np.meshgrid(a_grid, b_grid)
+    x = np.full((h, w), 0.5, np.float64)
+    lyap = np.zeros((h, w), np.float64)
+    transient = 200
+    iterations = 500
+    for i in range(transient + iterations):
+        param = np.where(pattern[i % len(pattern)] == 0, A, B)
+        x = param * x * (1 - x)
+        # Clamp to keep the logistic map finite; escaped orbits are non-chaotic.
+        x = np.clip(x, -1e3, 1 + 1e3)
+        deriv = np.where(pattern[i % len(pattern)] == 0, 1 - 2 * x, 1 - 2 * x)
+        lyap += np.log(np.abs(param * (1 - 2*x)) + 1e-12)
+    field = lyap / iterations
+    return norm(field, 5, 99.5)
+
+
 SYSTEMS = {"clifford": gen_clifford, "ikeda": gen_ikeda,
-           "dejong": gen_dejong, "svensson": gen_svensson}
+           "dejong": gen_dejong, "svensson": gen_svensson,
+           "curl": gen_curl, "lyapunov": gen_lyapunov}
 
 
 # ---------------------------------------------------------------- main

@@ -1,4 +1,4 @@
-# fftwall
+fftwall
 
 procedurally generated fourier transform wallpapers.
 
@@ -19,7 +19,7 @@ python3 -m venv .venv
 .venv/bin/python fftwall.py svensson -d both       # spectrum + the attractor itself
 .venv/bin/python fftwall.py dejong -c dragon       # kanagawa-dragon palette
 .venv/bin/python fftwall.py ikeda -z 2             # magnify spectrum center
-.venv/bin/python fftwall.py all -s 7680x4320       # every system at 8k
+.venv/bin/python fftwall.py all -s 4320x2400       # every system at 4k+
 .venv/bin/python fftwall.py clifford --seed 7 -o out
 ```
 
@@ -44,10 +44,15 @@ and downscaling averages it away.
 - `ikeda` — ikeda map (light in a ring cavity); swirling interference rings
 - `dejong` — peter de jong map; smoky folded filament clouds
 - `svensson` — svensson map; looping ribbon sheets and glowing tori
+- `curl` — divergence-free vector-field streamlines; silk and lace
+- `lyapunov` — lyapunov exponent map of two coupled logistic maps;
+  sharp fractal boundaries between order and chaos
 
 each seed also picks a curated parameter set, so silhouettes vary a lot
 run to run. the space domain (`-d space` or `-d both`) is often the
-better wallpaper — the spectra like `-z 2`.
+better wallpaper — the spectra like `-z 2`. `curl` and `lyapunov` are
+especially vivid in the spatial domain (`-d space`), `curl` benefits from
+a little grain (`-g 0.05`) to soften the lattice in its spectrum.
 
 ## colormaps
 

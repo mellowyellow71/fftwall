@@ -1,4 +1,4 @@
-fftwall
+# fftwall
 
 procedurally generated fourier transform wallpapers.
 
@@ -44,15 +44,14 @@ and downscaling averages it away.
 - `ikeda` — ikeda map (light in a ring cavity); swirling interference rings
 - `dejong` — peter de jong map; smoky folded filament clouds
 - `svensson` — svensson map; looping ribbon sheets and glowing tori
-- `curl` — divergence-free vector-field streamlines; silk and lace
-- `lyapunov` — lyapunov exponent map of two coupled logistic maps;
-  sharp fractal boundaries between order and chaos
+- `curl` — streamlines of a divergence-free flow; silk and lace
+- `lyapunov` — markus-lyapunov fractal (logistic map with alternating
+  forcing); glowing stable islands with sharp fractal edges
 
 each seed also picks a curated parameter set, so silhouettes vary a lot
 run to run. the space domain (`-d space` or `-d both`) is often the
 better wallpaper — the spectra like `-z 2`. `curl` and `lyapunov` are
-especially vivid in the spatial domain (`-d space`), `curl` benefits from
-a little grain (`-g 0.05`) to soften the lattice in its spectrum.
+made for the spatial domain (`-d space`); their spectra are soft blobs.
 
 ## colormaps
 

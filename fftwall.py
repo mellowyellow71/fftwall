@@ -138,78 +138,77 @@ def gen_svensson(w, h, rng):
     return density(np.concatenate(xs), np.concatenate(ys), w, h)
 
 
-CURL_AMPS = [1.0, 1.4, 1.8, 2.3, 3.0]
-CURL_MODES = [(0.5, 0.0), (0.35, 0.75), (0.25, 1.6), (0.175, 2.5)]
+CURL = [(5, 1.5), (7, 2.5), (9, 4.0), (12, 6.0)]  # (fourier modes, rms cycles across the frame)
 
 
 def gen_curl(w, h, rng):
-    """divergence-free vector-field streamlines — silk and lace."""
-    amp = rng.choice(CURL_AMPS)
-    m1, m2 = CURL_MODES[rng.integers(len(CURL_MODES))]
-    t = rng.uniform(0, 2 * np.pi)
+    """streamlines of a divergence-free flow — silk and lace.
+
+    psi is a sum of random fourier modes and the flow is (dpsi/dy, -dpsi/dx),
+    so it is divergence-free by construction and particles ride the level
+    sets of psi. unit speed, one pixel per step, random lifetimes.
+    """
+    nmodes, cycles = CURL[rng.integers(len(CURL))]
+    f = rng.normal(0, cycles, (nmodes, 2))
+    k = 2 * np.pi * f
+    amp = 1 / (1 + (f * f).sum(1) / cycles ** 2)
+    ph = rng.uniform(0, 2 * np.pi, nmodes)
     s = max(w, h)
-    x = (np.arange(w) - w / 2) / s
-    y = (np.arange(h) - h / 2) / s
-    gx, gy = np.meshgrid(x, y)
-    gx += amp * np.cos(m2 * gx + t)
-    gy -= amp * np.sin(m2 * gy + t)
-    psi = np.sin(m1 * gx) * np.cos(m1 * gy) + m1 / 2 * np.sin(m2 * (gx + gy) + t)
-    vx, vy = np.gradient(psi, axis=(1, 0))
-    vx, vy = vy.copy(), -vx.copy()
-    length = np.hypot(vx, vy)
-    if length.max() > 0:
-        vx /= length.max()
-        vy /= length.max()
-    H, W = gx.shape
-    # Jitter breaks the perfect lattice so streamlines trace silk, not spokes.
-    vx += rng.normal(0, 0.02, (H, W)).astype(np.float32)
-    vy += rng.normal(0, 0.02, (h, w)).astype(np.float32)
-    vx = np.where(vx > 0.1, vx, 0)
-    vy = np.where(vy > 0.1, vy, 0)
-    d = np.zeros((H, W), np.float32)
-    # Vectorized streamline tracing: 4096 particles, 1500 steps.
-    px = rng.uniform(0, W, 4096)
-    py = rng.uniform(0, H, 4096)
+    n = max(512, w * h // 2500)
+    box = np.array([w - 1, h - 1], np.float64)
+
+    def spawn(m):
+        return rng.uniform(0, box, (m, 2)), rng.integers(150, 900, m)
+
+    p, life = spawn(n)
+    weight = rng.exponential(1.0, n)  # some threads catch more light
+    xs, ys, ws = [], [], []
     for _ in range(1500):
-        x0 = np.floor(px).astype(int) % W
-        y0 = np.floor(py).astype(int) % H
-        x1 = (x0 + 1) % W
-        y1 = (y0 + 1) % H
-        fx = px - np.floor(px)
-        fy = py - np.floor(py)
-        vxp = (vx[y0,x0]*(1-fx) + vx[y0,x1]*fx) * (1-fy) + (vx[y1,x0]*(1-fx) + vx[y1,x1]*fx) * fy
-        vyp = (vy[y0,x0]*(1-fx) + vy[y0,x1]*fx) * (1-fy) + (vy[y1,x0]*(1-fx) + vy[y1,x1]*fx) * fy
-        ix = px.astype(int) % W
-        iy = py.astype(int) % H
-        d[iy, ix] += 1.0
-        px = (px + vxp * 2.5) % W
-        py = (py + vyp * 2.5) % H
-    return norm(np.log1p(d), 1, 99.9)
+        c = amp * np.cos(p / s @ k.T + ph)
+        v = np.stack([c @ k[:, 1], -(c @ k[:, 0])], axis=1)
+        p += v / (np.hypot(v[:, 0], v[:, 1])[:, None] + 1e-9)
+        life -= 1
+        dead = (life <= 0) | (p < 0).any(1) | (p >= box).any(1)
+        if dead.any():
+            p[dead], life[dead] = spawn(int(dead.sum()))
+        xs.append(p[:, 0].copy())
+        ys.append(p[:, 1].copy())
+        ws.append(weight)
+    x, y, wt = np.concatenate(xs), np.concatenate(ys), np.concatenate(ws)
+    # bilinear splat so sub-pixel positions draw smooth lines
+    x0, y0 = np.floor(x).astype(np.int64), np.floor(y).astype(np.int64)
+    fx, fy = x - x0, y - y0
+    d = np.zeros(h * w, np.float64)
+    for dx, dy, wgt in ((0, 0, (1 - fx) * (1 - fy)), (1, 0, fx * (1 - fy)),
+                        (0, 1, (1 - fx) * fy), (1, 1, fx * fy)):
+        d += np.bincount((y0 + dy) * w + x0 + dx, wt * wgt, minlength=h * w)
+    return np.log1p(d.reshape(h, w).astype(np.float32))
+
+
+# markus-lyapunov windows: (forcing pattern, a range, b range)
+LYAPUNOV = [("AB", (2.4, 4.0), (2.4, 4.0)), ("AABAB", (2.5, 4.0), (2.5, 4.0)),
+            ("BBBBBBAAAAAA", (3.4, 4.0), (2.5, 3.4)), ("AAB", (3.0, 4.0), (2.6, 4.0)),
+            ("ABB", (2.6, 4.0), (3.0, 4.0)), ("AABA", (3.2, 4.0), (3.2, 4.0))]
 
 
 def gen_lyapunov(w, h, rng):
-    """lyapunov exponent map of two coupled logistic maps."""
-    a_min, a_max = rng.uniform(3.4, 3.7), rng.uniform(4.1, 4.5)
-    b_min, b_max = rng.uniform(3.4, 3.7), rng.uniform(4.1, 4.5)
-    pattern_abc = ['AB', 'AABA', 'ABB', 'ABAB', 'AABBA', 'AAAB']
-    pattern_str = pattern_abc[rng.integers(len(pattern_abc))]
-    pattern = np.array([0 if ch == 'A' else 1 for ch in pattern_str])
-    a_grid = np.linspace(a_min, a_max, w)
-    b_grid = np.linspace(b_min, b_max, h)
-    A, B = np.meshgrid(a_grid, b_grid)
-    x = np.full((h, w), 0.5, np.float64)
-    lyap = np.zeros((h, w), np.float64)
-    transient = 200
-    iterations = 500
-    for i in range(transient + iterations):
-        param = np.where(pattern[i % len(pattern)] == 0, A, B)
-        x = param * x * (1 - x)
-        # Clamp to keep the logistic map finite; escaped orbits are non-chaotic.
-        x = np.clip(x, -1e3, 1 + 1e3)
-        deriv = np.where(pattern[i % len(pattern)] == 0, 1 - 2 * x, 1 - 2 * x)
-        lyap += np.log(np.abs(param * (1 - 2*x)) + 1e-12)
-    field = lyap / iterations
-    return norm(field, 5, 99.5)
+    """markus-lyapunov fractal: lyapunov exponent of the logistic map
+    x -> r x (1 - x), r alternating between a (across) and b (down) in a
+    fixed pattern. stable regions glow, chaos stays dark."""
+    seq, (a0, a1), (b0, b1) = LYAPUNOV[rng.integers(len(LYAPUNOV))]
+    a0, b0 = a0 + rng.uniform(-0.1, 0.1), b0 + rng.uniform(-0.1, 0.1)
+    a1, b1 = min(4.0, a1 + rng.uniform(-0.1, 0.05)), min(4.0, b1 + rng.uniform(-0.1, 0.05))
+    a = np.linspace(a0, a1, w, dtype=np.float32)[None, :]
+    b = np.linspace(b0, b1, h, dtype=np.float32)[:, None]
+    x = np.full((h, w), 0.5, np.float32)
+    lyap = np.zeros((h, w), np.float32)
+    transient, iters = 150, 450
+    for i in range(transient + iters):
+        r = a if seq[i % len(seq)] == "A" else b
+        if i >= transient:
+            lyap += np.log(np.abs(r * (1 - 2 * x)) + 1e-12)
+        x = r * x * (1 - x)
+    return -lyap / iters
 
 
 SYSTEMS = {"clifford": gen_clifford, "ikeda": gen_ikeda,
